@@ -112,6 +112,12 @@ Di Rust, kita bisa menggunakan module `std::thread` untuk membuat thread.
 | Channel | `test_chanel` | Kirim/terima 1 data via channel |
 | Mengirim Banyak Data | `test_send_may_data_to_chanel` | Multi-message dalam channel |
 | Channel Lifecycle | `test_chanel_livecycle` | Perilaku sender/receiver saat lifecycle berakhir |
+| Multi Sender | `test_multi_sender` | Clone sender untuk kirim dari banyak thread |
+| Race Condition | `test_thread_race_condition` | Demonstrasi data tidak konsisten akibat race condition |
+| Atomic | `test_atomic` | Tipe data Atomic yang thread-safe |
+| Atomic Reference | `test_atomic_reference` | `Arc` untuk sharing ownership Atomic antar thread |
+| Mutex | `test_mutex` | Lock data dengan `Mutex` + `Arc` |
+| Thread Local | `test_thread_local` | Data yang hidup dalam scope thread masing-masing |
 
 ## Penjelasan Detail per Section Test
 
@@ -425,7 +431,7 @@ fn test_send_may_data_to_chanel() {
 }
 ```
 
-### Channel Lifecycle (`test_chanel_livecycle`)
+### Channel Lifecycle
 - Saat channel dibuat, Rust otomatis membuat `Sender` dan `Receiver`.
 - Jika lifecycle sender berakhir (sender di-drop), receiver tidak akan menerima data baru lagi.
 - Karena receiver mengimplementasikan `Iterator`, data bisa diproses dengan `for` loop tanpa `break` manual.
@@ -455,6 +461,215 @@ fn test_chanel_livecycle() {
     let _ = handle_receiver.join();
 }
 ```
+
+### Multi Sender
+- Nama module channel adalah **Multi Producer Single Consumer (mpsc)**, artinya satu receiver bisa menerima dari banyak sender.
+- Karena ownership `Sender` dipindahkan ke closure thread, untuk membuat sender kedua cukup lakukan `.clone()` pada sender asli.
+- Sender hasil clone secara otomatis mengirim ke `Receiver` yang sama.
+
+```rust
+#[test]
+fn test_multi_sender() {
+    let (sender, receiver) = std::sync::mpsc::channel::<String>();
+    let sender_clone = sender.clone();
+
+    let result_join_handle1 = thread::Builder::new()
+        .name("thread kim".to_string())
+        .spawn(move || {
+            for i in 1..=5 {
+                thread::sleep(Duration::from_secs(2));
+                sender_clone.send("send from sender clone".to_string());
+            }
+        });
+
+    let result_join_handle2 = thread::Builder::new()
+        .name("thread abdillah".to_string())
+        .spawn(move || {
+            for i in 1..=5 {
+                thread::sleep(Duration::from_secs(2));
+                sender.send("send from main sender".to_string());
+            }
+        });
+
+    let result_receiver_join_hendle = thread::Builder::new()
+        .name("receiver thread".to_string())
+        .spawn(move || {
+            for message in receiver.iter() {
+                println!("{}", message);
+            }
+        });
+
+    // join semua handle ...
+}
+```
+
+### Race Condition
+- **Race Condition** adalah kondisi ketika dua atau lebih thread mengubah data mutable yang sama secara bersamaan tanpa koordinasi.
+- Akibatnya, hasil akhir data tidak bisa diprediksi dan tidak konsisten setiap kali dijalankan.
+- Pada contoh ini, beberapa thread mengakses `static mut COUNTER` secara bersamaan sehingga hasilnya selalu berbeda.
+
+```rust
+static mut COUNTER: i32 = 0;
+
+#[test]
+fn test_thread_race_condition() {
+    let mut handles = vec![];
+    for _ in 0..=10 {
+        let handle = thread::spawn(|| unsafe {
+            for j in 0..=100000 {
+                COUNTER += 1;
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("counter : {}", unsafe { COUNTER }); // hasilnya tidak akan pernah sama karena terjadi race condition
+}
+```
+
+**Cara mengatasi Race Condition:**
+- Menggunakan **Atomic** (operasi atomik yang dijamin tidak terinterupsi)
+- Menggunakan **Lock / Mutex** (hanya satu thread yang boleh akses data dalam satu waktu)
+
+### Atomic (`test_atomic`)
+- `Atomic` adalah tipe data wrapper yang digunakan untuk sharing antar thread dengan jaminan keamanan terhadap Race Condition.
+- Rust menyediakan berbagai varian Atomic sesuai tipe data: `AtomicI32`, `AtomicBool`, `AtomicUsize`, dll.
+- Operasi seperti `fetch_add` dijamin berjalan secara atomik — tidak bisa diinterupsi di tengah jalan oleh thread lain.
+- Pada contoh ini, `counter` dideklarasikan `static` agar bisa diakses dari semua thread tanpa perlu memindahkan ownership.
+
+```rust
+#[test]
+fn test_atomic() {
+    use std::sync::atomic::{AtomicI32, Ordering};
+
+    static counter: AtomicI32 = AtomicI32::new(0);
+    let mut handles = vec![];
+    for _ in 1..=10 {
+        let hendle = thread::spawn(move || {
+            for _ in 1..=100000 {
+                counter.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+        handles.push(hendle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("counter : {}", counter.load(Ordering::Relaxed));
+}
+```
+
+Referensi:
+- https://doc.rust-lang.org/std/sync/atomic/index.html
+
+### Atomic Reference
+- Problem penggunaan `static` adalah tidak selalu bisa dipakai di semua kasus.
+- `Arc` (**Atomic Reference Counted**) adalah solusi untuk berbagi ownership data antar banyak thread secara aman.
+- `Arc` mirip `Rc`, tapi semua operasi reference counting-nya bersifat atomik, sehingga thread-safe.
+- Cara pakainya: buat `Arc::clone(&counter)` sebelum `move` ke tiap thread, sehingga setiap thread punya reference ke data yang sama.
+
+```rust
+use std::sync::Arc;
+
+#[test]
+fn test_atomic_reference() {
+    let counter = Arc::new(AtomicI32::new(0));
+    let mut handles = vec![];
+    for _ in 0..=10 {
+        let counter_clone = Arc::clone(&counter);
+        let hendle = thread::spawn(move || {
+            for j in 0..=100000 {
+                counter_clone.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+        handles.push(hendle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("counter : {}", counter.load(Ordering::Relaxed));
+}
+```
+
+Referensi:
+- https://doc.rust-lang.org/std/sync/struct.Arc.html
+
+### Mutex (`test_mutex`)
+- **Mutex** (Mutual Exclusion) adalah mekanisme lock yang memastikan hanya satu thread yang boleh mengakses data dalam satu waktu.
+- Thread yang ingin mengakses data harus memanggil `lock()` terlebih dahulu, dan akan diblokir sampai lock tersedia.
+- Setelah data keluar dari scope (di-drop), lock otomatis dikembalikan ke Mutex sehingga thread lain bisa mengambilnya.
+- `Mutex` biasanya dikombinasikan dengan `Arc` agar bisa di-share ke banyak thread.
+
+```rust
+#[test]
+fn test_mutex() {
+    let counter: Arc<std::sync::Mutex<i32>> = Arc::new(std::sync::Mutex::new(0));
+    let mut handles = vec![];
+    for _ in 0..=10 {
+        let counter_clone = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            for j in 0..100000 {
+                let mut num = counter_clone.lock().unwrap();
+                *num += 1;
+            }
+            // lock otomatis dilepas saat `num` keluar dari scope
+        });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().unwrap()
+    }
+
+    println!("counter : {}", *counter.lock().unwrap());
+}
+```
+
+Referensi:
+- https://doc.rust-lang.org/std/sync/struct.Mutex.html
+
+### Thread Local
+- **Thread Local** adalah fitur untuk menyimpan data yang eksklusif milik satu thread.
+- Data Thread Local mengikuti lifecycle thread: ketika thread selesai, data tersebut di-drop secara otomatis.
+- Cocok untuk data yang memang hanya relevan dalam scope thread tertentu dan tidak perlu dipertukarkan antar thread.
+- Untuk membuat data Thread Local, gunakan macro `thread_local!`.
+- Gunakan `Cell` untuk tipe data yang bisa di-copy, atau `RefCell` untuk tipe data yang perlu mutability runtime.
+- Akses data dengan `.with_borrow()` (baca) atau `.with_borrow_mut()` (ubah).
+
+```rust
+thread_local! {
+    pub static NAME: std::cell::RefCell<String> =
+        std::cell::RefCell::<String>::new("Default".to_string());
+}
+
+#[test]
+fn test_thread_local() {
+    let handle = thread::spawn(|| {
+        NAME.with_borrow_mut(|name| {
+            *name = "Kim".to_string();
+        });
+
+        NAME.with_borrow(|name| {
+            println!("name : {}", name); // "Kim"
+        })
+    });
+    handle.join();
+
+    NAME.with_borrow(|name| {
+        println!("name : {}", name); // "Default" — data di main thread tidak ikut berubah
+    })
+}
+```
+
+**Kesimpulan:**
+- Perubahan pada `NAME` di dalam thread tidak mempengaruhi nilai `NAME` di thread lain (termasuk main thread), karena masing-masing thread punya salinan data sendiri.
 
 ## Sample Code Singkat
 
