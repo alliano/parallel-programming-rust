@@ -437,7 +437,7 @@ mod tests {
                     sender.send("send from main sender".to_string());
                 }
             });
-        
+
         let result_receiver_join_hendle = thread::Builder::new()
             .name("receiver thread".to_string())
             .spawn(move || {
@@ -449,26 +449,26 @@ mod tests {
         match result_join_handle1 {
             Ok(handel) => {
                 let _ = handel.join();
-            },
+            }
             Err(_) => {}
         }
         match result_join_handle2 {
             Ok(handle) => {
                 let _ = handle.join();
-            },
+            }
             Err(_) => {}
         }
         match result_receiver_join_hendle {
             Ok(hendle) => {
                 let _ = hendle.join();
-            },
+            }
             Err(_) => {}
         }
     }
 
     /*
      * Race Condition
-     * 
+     *
      * Salah satu masalah ketika kita membuat aplikasi berbasis multi thread adalah, masalah Race Condition
      * Race Condition adalah kejadian dimana dua atau lebih thread mengubah ke mutable data yang sama
      * Ketika cara mengubahnya salah, maka bisa terjadi yang masalah Race Condition, sehingga hasil data tidak sesuai dengan yang kita inginkan
@@ -481,7 +481,7 @@ mod tests {
     fn test_thread_race_condition() {
         let mut handles = vec![];
         for _ in 0..=10 {
-            let handle = thread::spawn(||unsafe {
+            let handle = thread::spawn(|| unsafe {
                 for j in 0..=100000 {
                     COUNTER += 1;
                 }
@@ -498,7 +498,7 @@ mod tests {
 
     /*
      * Bagaimana Caranya Mengatasi Race Condition
-     * 
+     *
      * Ada beberapa cara untuk mengatasi Race Condition
      * Menggunakan Atomic
      * Atau menggunakan Lock
@@ -507,12 +507,12 @@ mod tests {
 
     /*
      * Atomic
-     * 
+     *
      * Atomic merupakan tipe data yang digunakan untuk sharing untuk beberapa thread
      * Atomic sendiri merupakan tipe data yang membungkus tipe data aslinya
      * Kita bisa pilih jenis tipe data Atomic, sesuai dengan tipe data aslinya yang akan kita gunakan
      * Tipe data Atomic digaransi aman terhadap Race Condition
-     * https://doc.rust-lang.org/std/sync/atomic/index.html 
+     * https://doc.rust-lang.org/std/sync/atomic/index.html
      */
 
     #[test]
@@ -539,14 +539,14 @@ mod tests {
 
     /*
      * Atomic Reference
-     * 
+     *
      * Salah satu problem ketika sharing data menggunakan multi thread di Rust adalah, ownership dari data harus dipindah ke thread, sedangkan dalam satu waktu, hanya boleh satu thread yang own data tersebut
      * Oleh karena itu pada kode Atomic sebelumnya, kita gunakan static agar scope nya global, namun kadang tidak semua kasus kita bisa menggunakan static
      * Rust menyediakan Arc (Atomic Reference Counted), yaitu tipe data yang bisa digunakan untuk membuat reference ke data lain, tipe ini mirip seperti tipe Rc, namun karena semua operasi Arc itu atomic, oleh karena itu operasinya lebih mahal tapi keuntungannya adalah thread safe
-     * https://doc.rust-lang.org/std/sync/struct.Arc.html 
+     * https://doc.rust-lang.org/std/sync/struct.Arc.html
      */
 
-     use std::sync::Arc;
+    use std::sync::Arc;
     #[test]
     fn test_atomic_reference() {
         let counter = Arc::new(AtomicI32::new(0));
@@ -570,13 +570,12 @@ mod tests {
 
     /*
      * Mutex
-     * 
+     *
      * Mutex adalah Mutual Exclusion, yaitu tipe data yang digunakan untuk melindungi data yang di-sharing ke lebih dari satu thread
      * Mutex akan memblok thread dan menunggu sampai lock (kunci) tersedia
      * Kita bisa menggunakan method lock() pada Mutex untuk menunggu sampai mendapatkan data, dan setelah data keluar dari scope, maka lock (kunci) akan dikembalikan ke Mutex sehingga thread lain bisa mengambil lock (kunci) nya
-     * https://doc.rust-lang.org/std/sync/struct.Mutex.html 
+     * https://doc.rust-lang.org/std/sync/struct.Mutex.html
      */
-
 
     #[test]
     fn test_mutex() {
@@ -602,7 +601,7 @@ mod tests {
 
     /*
      * Thread Local
-     * 
+     *
      * Rust memiliki fitur untuk menyimpan data di Thread bernama Thread Local
      * Konsep Thread Local di Rust mirip seperti di Java, dimana alur hidup data akan mengikuti Thread, jika Thread selesai, maka data di Thread Local akan di drop
      * Hal ini cocok ketika kita ingin membuat data yang memang ingin digunakan dalam scope thread selama thread tersebut aktif, dan tidak bertukar dengan thread lain
@@ -610,14 +609,14 @@ mod tests {
 
     /*
      * Membuat Data di Thread Local
-     * 
+     *
      * Untuk membuat data di Thread Local, kita harus buat menggunakan macro thread_local!
      * Kita bisa tentukan menggunakan Cell atau RefCell, tergantung apakah tipe datanya mutable atau tidak
      */
 
-     thread_local! {
-        pub static NAME: std::cell::RefCell<String> = std::cell::RefCell::<String>::new("Default".to_string());
-     }
+    thread_local! {
+       pub static NAME: std::cell::RefCell<String> = std::cell::RefCell::<String>::new("Default".to_string());
+    }
 
     #[test]
     fn test_thread_local() {
@@ -630,10 +629,269 @@ mod tests {
                 println!("name : {}", name);
             })
         });
-        handle.join();
+        let _ = handle.join();
         NAME.with_borrow(|name| {
             println!("name : {}", name);
         })
     }
 
+    /*
+     * Thread Panic
+     *
+     * Apa akibatnya ketika terjadi panic di dalam thread?
+     * Maka thread tersebut akan berhenti, tapi tidak akan menghentikan thread lainnya
+     * Jadi tidak perlu khawatir ketika menjalankan thread baru, dan terjadi panic pada thread tersebut, maka thread utama (main) tidak akan berhenti, karena berbeda thread
+     * Kecuali jika terjadi panic di thread utama (main), otomatis thread utama akan berhenti
+     */
+
+    #[test]
+    fn test_thread_panic() {
+        let handle: JoinHandle<_> = thread::spawn(|| {
+            for i in 1..=5 {
+                println!("processing : {}", i);
+                thread::sleep(Duration::from_secs(1));
+                if i == 3 {
+                    panic!("Thread panicked at processing {}", i);
+                }
+            }
+        });
+        match handle.join() {
+            Ok(_) => println!("Thread completed successfully"),
+            Err(e) => println!("Thread panicked: {:?}", e),
+        }
+    }
+
+    /*
+     * Barier
+     *
+     * Barier merupakan tipe data yang bisa digunakan agar beberapa thread menunggu sebelum melakukan pekerjaannya secara bersamaan
+     * Contoh misal, kita akan membuat kode program yang menunggu jika 10 thread sudah ada, baru semuanya boleh berjalan, jika belum 10 thread, maka program tidak boleh berjalan terlebih dahulu
+     * https://doc.rust-lang.org/std/sync/struct.Barrier.html
+     */
+
+    #[test]
+    fn test_barier() {
+        let barier = std::sync::Arc::new(std::sync::Barrier::new(10));
+        let mut handles = vec![];
+        for i in 0..=10 {
+            let barier_clone = std::sync::Arc::clone(&barier);
+            let handle = thread::spawn(move || {
+                println!("Thread {} is waiting at the barrier", i);
+                barier_clone.wait();
+                println!("Thread {} passed the barrier", i);
+            });
+            handles.push(handle);
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    }
+
+    /*
+     * Once
+     *
+     * Kadang ada kasus kita membuat variable yang perlu diinisialisasi datanya diawal cukup sekali saja
+     * Namun ingin memastikan bahwa hanya ada satu thread yang bisa memanggil proses inisialisasi datanya
+     * Kita bisa menggunakan Once untuk membantu hal ini
+     * Once bisa menjaga bahwa hanya ada satu thread saja yang bisa memanggil proses inisialisasi, dan hanya sekali saja dipanggil
+     * https://doc.rust-lang.org/std/sync/struct.Once.html
+     */
+
+    static mut TOTAL_COUNTER: i32 = 0;
+    static TOTAL_INIT: std::sync::Once = std::sync::Once::new();
+
+    fn get_total_counter() -> i32 {
+        unsafe {
+            TOTAL_INIT.call_once(|| {
+                TOTAL_COUNTER += 1;
+            });
+            return TOTAL_COUNTER;
+        }
+    }
+
+    #[test]
+    fn test_once() {
+        let mut handles = vec![];
+        for _ in 0..10 {
+            let handle = thread::spawn(|| {
+                let total = get_total_counter();
+                println!("total : {}", total);
+            });
+
+            handles.push(handle);
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    }
+
+    /*
+     * Future
+     *
+     * Future adalah representasi dari komputasi asynchronous
+     * Future merupakan value yang memungkinkan komputasinya belum selesai. Dengan menggunakan Future, memungkinkan thread untuk melanjutkan pekerjaan lainnya, selama menunggu nilainya ada pada Future
+     * Future mirip dengan Promise di JavaScript, atau mirip dengan Future di Java
+     * https://doc.rust-lang.org/std/future/trait.Future.html
+     */
+
+    /*
+     * Pool
+     *
+     * Future memiliki satu method bernama poll(), yang digunakan untuk mengambil data di Future
+     * Hasil dari poll() method adalah data enum Poll
+     * Pada enum Poll, terdapat dua opsi, Ready jika data sudah ada, Pending jika data belum tersedia
+     * https://doc.rust-lang.org/std/task/enum.Poll.html
+     */
+
+    /*
+     * Membuat Future
+     *
+     * Future merupakan Trait, untuk membuat Future, kita perlu menggunakan method dengan kata kunci async
+     * Method dengan kata kunci async, secara otomatis datanya akan mengembalikan tipe data Future
+     * Kata kunci async akan kita bahas dimateri selanjutnya
+     */
+
+    /*
+     * Async
+     *
+     * Seperti yang dijelaskan di awal, untuk membuat Future, kita tidak buat secara manual, kita akan menggunakan kata kunci async
+     * Function yang menggunakan kata kunci async, maka return value nya adalah Future
+     */
+
+    async fn get_async_data() -> String {
+        thread::sleep(Duration::from_secs(3));
+        return "Hello from async".to_string();
+    }
+
+    /*
+     * Memanggil Kode Async
+     *
+     * Kode async tidak bisa dipanggil pada kode non async, oleh karena itu untuk memanggil kode async, kita harus menggunakan kode async
+     * Sayangnya, secara default Rust hanya menyediakan kontrak untuk membuat kode async, ketika ingin menjalankan kode async, kita perlu menggunakan Runtime / Executor, dan secara default Rust tidak menyediakan
+     * Oleh karena itu, kita perlu menggunakan library Runtime / Executor untuk menjalankan kode async
+     */
+
+    /*
+     * Liberary Runtime unutk Async
+     *
+     * Ada banyak library Runtime untuk Async, seperti :
+     * Tokio : https://docs.rs/tokio/latest/tokio/
+     * Async Std : https://docs.rs/async-std/latest/async_std/
+     * Smol : https://docs.rs/smol/latest/smol/
+     * kita akan menggunakan Tokio, salah satu library Runtime untuk Async yang lumayan populer di Rust
+     */
+
+    /*
+     * Menginstall Tokio
+     *
+     * Silahkan tambahkan Library Tokio menggunakan perintah :
+     * cargo add tokio --features full
+     */
+
+    /*
+     * Async test
+     * 
+     * Untuk melakukan pengetesan kode Async, kita bisa menggunakan Tokio
+     * Hal ini karena secara default Rust tidak mendukung unit test kode async
+     * Kita bisa menggunakan attribute tokio::test
+     */
+
+
+    #[tokio::test]
+    async fn test_future() {
+        let result = get_async_data();
+
+        /*
+         * Await
+         * 
+         * Secara default, Future merupakan tipe data Lazy, artinya tidak akan dieksekusi jika tidak dijalankan
+         * Agar Future dieksekusi, kita bisa menggunakan await
+         * Await hanya bisa digunakan dalam kode async, karena yang dilakukan await sebenarnya adalah melakukan poll() terhadap Future, berbeda dengan join() pada Thread
+         */
+
+        let result_data = result.await;
+        println!("result : {}", result_data);
+    }
+
+    /*
+     * Masalah Dengan Thread
+     * 
+     * Salah satu permasalahan dengan Thread adalah, Thread masih dianggap mahal jika kita menggunakan terlalu banyak
+     * Thread akan dijalankan dalam OS (Operating System) Thread, yang artinya ukuran per Thread bisa mencapai 2-4MB
+     * Dengan begitu, akan sangat terbatas dengan jumlah memory yang kita gunakan
+     * Di bahasa pemrograman seperti Golang atau Kotlin, terdapat fitur Lightweight Thread, seperti Goroutines atau Coroutines
+     * Di Rust, fitur ini juga tersedia, dan bernama Task
+     * https://doc.rust-lang.org/std/task/index.html 
+     */
+
+    /*
+     * Tokio task
+     * 
+     * Rust menyediakan kontrak untuk Task, namun implementasinya tetap kita perlu menggunakan Runtime Async yang kita gunakan
+     * Kita bisa menggunakan Tokio Task untuk membuat Task, dan cara penggunaannya mirip seperti Thread
+     * https://docs.rs/tokio/latest/tokio/task/index.html 
+     * Yang perlu diperhatikan adalah, saat menggunakan Task, jangan menggunakan fitur Thread seperti Sleep, karena itu bisa menghentikan Thread yang digunakan oleh Task
+     */
+
+    /*
+     * Concurrent
+     * 
+     * Task adalah implementasi dari Concurrent, dimana jika kita menggunakan Thread, Thread tidak bisa berpindah-pindah pekerjaan, harus menyelesaikan pekerjaan sampai selesai
+     * Sedangkan Task, sebenarnya secara internal, Task tetap akan dijalankan dalam Thread, namun Thread yang menjalankan Task, bisa berpindah-pindah Task sesuai kebutuhan, misal ketika kita menghentikan Task dengan sleep(), Thread akan menjalankan Task yang lainnya
+     */
+
+    async fn load_data_from_database(wait: u64) -> String {
+        println!("Start loading data from database...");
+        tokio::time::sleep(Duration::from_secs(wait)).await;
+        println!("Finished loading data from database");
+        return "Data from database".to_string();
+    }
+
+    #[tokio::test]
+    async fn test_concurrent() {
+        let mut handles = vec![];
+        for i in 0..=5 {
+            let handle = tokio::spawn(load_data_from_database(i));
+            handles.push(handle);
+        }
+        for handle in handles {
+            let result = handle.await.unwrap();
+            println!("result : {}", result);
+        }
+    }
+
+    /*
+     * Task Runtime
+     * 
+     * Secara default Tokio sudah menyediakan Runtime yang bisa langsung kita gunakan
+     * Namun, pada keadaan tertentu, mungkin kita ingin membuat Runtime sendiri agar lebih flexible, seperti mengatur jumlah thread nya misalnya
+     * Hal ini bisa kita lakukan, hanya saja, Tokio Runtime secara default ketika di-drop (keluar dari scope), dia tidak boleh di-drop di kode async
+     * Oleh karena itu, kita harus buat Tokio Runtime di scope kode non async
+     */
+
+    async fn run_concurrent_process(runtime: std::sync::Arc::<tokio::runtime::Runtime>){
+        let mut handles = vec![];
+        for i in 0..=5{
+            let handle = runtime.spawn(load_data_from_database(i));
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            let result = handle.await.unwrap();
+            println!("result : {}", result);
+        }
+    }
+
+    #[test]
+    fn test_runtime() {
+        let runtime = std::sync::Arc::new(tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(10)
+            .enable_time()
+            .build()
+            .unwrap());
+        
+        // menjalankan async function didalam runtime
+        runtime.block_on(run_concurrent_process(std::sync::Arc::clone(&runtime)));
+
+    }
 }

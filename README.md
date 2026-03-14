@@ -9,14 +9,15 @@ Project ini berisi contoh dasar:
 - Concurrency
 - Threading di Rust (`std::thread`)
 - Komunikasi antar thread dengan channel (`std::sync::mpsc`)
+- Asynchronous programming dengan Future dan Tokio
 
 ## Ringkasan Konsep Dasar
 
 ### 1. Pengenalan Parallel Programming
-Saat ini kita hidup di era multicore, dimana jarang sekali kita menggunakan prosesor yang single core.  
-Semakin canggih perangkat keras, maka software pun akan mengikuti, 
+Saat ini kita hidup di era multicore, dimana jarang sekali kita menggunakan prosesor yang single core.
+Semakin canggih perangkat keras, maka software pun akan mengikuti,
 dimana sekarang kita bisa dengan mudah membuat proses parallel di aplikasi.
-Parallel programming sederhananya adalah memecahkan suatu masalah dengan cara membaginya 
+Parallel programming sederhananya adalah memecahkan suatu masalah dengan cara membaginya
 menjadi yang lebih kecil, dan dijalankan secara bersamaan pada waktu yang bersamaan pula
 
 **Kesimpulan:**
@@ -28,7 +29,7 @@ Parallel programming adalah memecah pekerjaan besar menjadi bagian kecil, lalu d
 - Beberapa koki menyiapkan makanan di restoran, dimana tiap koki membuat makanan masing-masing
 - Antrian di Bank, dimana tiap teller melayani nasabah nya masing-masing
 
-**conoth:** 
+**Contoh:**
 - Menjalankan banyak aplikasi sekaligus
 - Beberapa koki memasak di waktu yang sama
 - Banyak teller melayani nasabah masing-masing
@@ -57,8 +58,8 @@ kita hanya membutuhkan sedikit Thread.
 
 ### 5. Contoh Concurrency
 
-Saat kita makan di cafe, kita bisa makan, lalu ngobrol, lalu minum, makan lagi, ngobrol lagi, minum lagi, dan seterusnya. 
-Tetapi kita tidak bisa pada saat yang bersamaan minum, makan dan ngobrol, hanya bisa melakukan satu hal pada satu waktu, 
+Saat kita makan di cafe, kita bisa makan, lalu ngobrol, lalu minum, makan lagi, ngobrol lagi, minum lagi, dan seterusnya.
+Tetapi kita tidak bisa pada saat yang bersamaan minum, makan dan ngobrol, hanya bisa melakukan satu hal pada satu waktu,
 namun bisa berganti kapanpun kita mau.
 
 **Kesimpulan:**
@@ -68,7 +69,7 @@ Analogi di cafe: makan, ngobrol, minum secara bergantian, bukan semua sekaligus.
 
 Banyak algoritma dibuat yang hanya membutuhkan CPU untuk menjalankannya. Algoritma jenis ini biasanya sangat tergantung dengan kecepatan CPU.
 Contoh yang paling populer adalah Machine Learning, oleh karena itu sekarang banyak sekali teknologi Machine Learning yang banyak menggunakan
-GPU karena memiliki core yang lebih banyak dibanding CPU biasanya. 
+GPU karena memiliki core yang lebih banyak dibanding CPU biasanya.
 Jenis algoritma seperti ini tidak ada benefitnya menggunakan Concurrency Programming, namun bisa dibantu dengan implementasi Parallel Programming.
 
 **Kesimpulan:**
@@ -76,8 +77,8 @@ CPU-bound: bottleneck di CPU, sangat tergantung kecepatan CPU, cocok dibantu par
 
 ### 7. I/O-Bound
 
-I/O-bound adalah kebalikan dari sebelumnya, dimana biasanya algoritma atau aplikasinya sangat tergantung dengan kecepatan input output devices 
-yang digunakan. 
+I/O-bound adalah kebalikan dari sebelumnya, dimana biasanya algoritma atau aplikasinya sangat tergantung dengan kecepatan input output devices
+yang digunakan.
 Contohnya aplikasi seperti membaca data dari file, database, dan lain-lain.
 Kebanyakan saat ini, biasanya kita akan membuat aplikasi jenis seperti ini.
 Aplikasi jenis I/O-bound, walaupun bisa terbantu dengan implementasi Parallel Programming, tapi benefitnya akan lebih baik jika menggunakan Concurrency Programming.
@@ -118,10 +119,16 @@ Di Rust, kita bisa menggunakan module `std::thread` untuk membuat thread.
 | Atomic Reference | `test_atomic_reference` | `Arc` untuk sharing ownership Atomic antar thread |
 | Mutex | `test_mutex` | Lock data dengan `Mutex` + `Arc` |
 | Thread Local | `test_thread_local` | Data yang hidup dalam scope thread masing-masing |
+| Thread Panic | `test_thread_panic` | Perilaku program saat thread mengalami panic |
+| Barrier | `test_barier` | Menunggu sejumlah thread sebelum semua boleh berjalan |
+| Once | `test_once` | Inisialisasi data hanya satu kali dari banyak thread |
+| Async / Future | `test_future` | Membuat dan menjalankan komputasi asynchronous |
+| Concurrent Task | `test_concurrent` | Menjalankan banyak task secara concurrent dengan Tokio |
+| Task Runtime | `test_runtime` | Membuat Tokio Runtime sendiri dan menjalankan async function |
 
 ## Penjelasan Detail per Section Test
 
-### Membuat Thread (`test_create_threed`)
+### Membuat Thread
 - Untuk membuat thread baru yang berjalan secara parallel dan asynchronous,
   kita bisa menggunakan `std::thread::spawn(closure)`.
 - Pada contoh ini, main test diberi jeda (`sleep`) agar output dari thread sempat terlihat.
@@ -140,7 +147,7 @@ fn test_create_threed() {
 }
 ```
 
-### Join Thread (`test_threed_join`)
+### Join Thread
 - Saat menjalankan thread dengan `spawn`, Rust mengembalikan `JoinHandle<T>`.
 - `JoinHandle` dapat digunakan untuk melakukan join melalui method `join()`.
 - `join()` akan mengembalikan `Result<T>`, sesuai return value dari thread-nya.
@@ -166,7 +173,7 @@ fn test_threed_join() {
 }
 ```
 
-### Keutamaan Menggunakan Thread (`test_sequential`, `test_parallel`)
+### Keutamaan Menggunakan Thread
 - Jika dua kalkulasi berat dijalankan tanpa thread, eksekusi menjadi synchronous dan sequential.
 - Misalnya tiap kalkulasi butuh 5 detik, totalnya bisa menjadi 10 detik.
 - Jika dijalankan dengan thread, kalkulasi berjalan asynchronous dan parallel,
@@ -215,7 +222,7 @@ fn test_parallel() {
 }
 ```
 
-### Closure (`test_closure`, `test_closure_as_fn_thread`)
+### Closure
 - Saat menjalankan thread, parameter pada `spawn()` biasanya ditulis dalam bentuk closure.
 - Closure boleh menggunakan variabel dari luar scope.
 - Namun, jika closure dikirim ke function lain seperti `spawn()`, ownership variabel
@@ -267,7 +274,7 @@ fn test_closure_as_fn_thread() {
 Referensi:
 - https://doc.rust-lang.org/error_codes/E0373.html
 
-### Closure `move` (`test_closure_move`)
+### Closure `move`
 - Dengan `move`, ownership variabel dipindahkan ke closure.
 - Cara ini aman saat closure dijalankan dalam thread.
 - Konsekuensinya, variabel yang sudah dipindah tidak bisa dipakai lagi di main thread.
@@ -289,7 +296,7 @@ fn test_closure_move() {
 }
 ```
 
-### Current Thread (`test_current_thread`)
+### Current Thread
 - Semua program Rust berjalan di thread, termasuk saat tidak membuat thread manual.
 - Unit test Rust juga berjalan dalam thread.
 - Untuk mendapatkan thread yang sedang aktif, gunakan `thread::current()`.
@@ -322,7 +329,7 @@ fn test_current_thread() {
 Referensi:
 - https://doc.rust-lang.org/std/thread/struct.Thread.html
 
-### Thread Factory (`test_thread_factory`)
+### Thread Factory
 - Saat membuat thread dengan `thread::spawn()`, kita memakai thread factory default dari Rust.
 - Jika butuh konfigurasi khusus, kita bisa membuat thread factory manual dengan `thread::Builder`.
 - Contoh konfigurasi: nama thread dan ukuran stack.
@@ -369,7 +376,7 @@ Referensi:
 Referensi:
 - https://doc.rust-lang.org/std/sync/mpsc/index.html
 
-### Channel (`test_chanel`)
+### Channel
 - Channel adalah struktur data mirip queue.
 - Thread dapat mengirim data ke channel dan menerima data dari channel.
 - Pihak di channel terdiri dari `Sender` (pengirim) dan `Receiver` (penerima).
@@ -397,7 +404,7 @@ fn test_chanel() {
 }
 ```
 
-### Mengirim Banyak Data (`test_send_may_data_to_chanel`)
+### Mengirim Banyak Data
 - Karena channel berbentuk queue, kita bisa memasukkan banyak data ke dalam channel.
 - Saat sender mengirim data, pengiriman bisa langsung sukses walau data belum diambil receiver.
 - Saat receiver mengambil data dan belum ada isi channel, receiver akan menunggu (`blocking`).
@@ -535,7 +542,7 @@ fn test_thread_race_condition() {
 - Menggunakan **Atomic** (operasi atomik yang dijamin tidak terinterupsi)
 - Menggunakan **Lock / Mutex** (hanya satu thread yang boleh akses data dalam satu waktu)
 
-### Atomic (`test_atomic`)
+### Atomic
 - `Atomic` adalah tipe data wrapper yang digunakan untuk sharing antar thread dengan jaminan keamanan terhadap Race Condition.
 - Rust menyediakan berbagai varian Atomic sesuai tipe data: `AtomicI32`, `AtomicBool`, `AtomicUsize`, dll.
 - Operasi seperti `fetch_add` dijamin berjalan secara atomik — tidak bisa diinterupsi di tengah jalan oleh thread lain.
@@ -602,7 +609,7 @@ fn test_atomic_reference() {
 Referensi:
 - https://doc.rust-lang.org/std/sync/struct.Arc.html
 
-### Mutex (`test_mutex`)
+### Mutex
 - **Mutex** (Mutual Exclusion) adalah mekanisme lock yang memastikan hanya satu thread yang boleh mengakses data dalam satu waktu.
 - Thread yang ingin mengakses data harus memanggil `lock()` terlebih dahulu, dan akan diblokir sampai lock tersedia.
 - Setelah data keluar dari scope (di-drop), lock otomatis dikembalikan ke Mutex sehingga thread lain bisa mengambilnya.
@@ -670,6 +677,193 @@ fn test_thread_local() {
 
 **Kesimpulan:**
 - Perubahan pada `NAME` di dalam thread tidak mempengaruhi nilai `NAME` di thread lain (termasuk main thread), karena masing-masing thread punya salinan data sendiri.
+
+### Thread Panic
+- Ketika terjadi `panic!` di dalam sebuah thread, thread tersebut akan berhenti, **tetapi tidak akan menghentikan thread lain**.
+- Thread utama (main) tetap berjalan normal selama panic terjadi di thread yang berbeda.
+- Untuk mendeteksi apakah thread mengalami panic, periksa hasil dari `handle.join()` — jika `Err`, berarti thread tersebut panic.
+
+```rust
+#[test]
+fn test_thread_panic() {
+    let handle: JoinHandle<_> = thread::spawn(|| {
+        for i in 1..=5 {
+            println!("processing : {}", i);
+            thread::sleep(Duration::from_secs(1));
+            if i == 3 {
+                panic!("Thread panicked at processing {}", i);
+            }
+        }
+    });
+    match handle.join() {
+        Ok(_) => println!("Thread completed successfully"),
+        Err(e) => println!("Thread panicked: {:?}", e),
+    }
+}
+```
+
+### Barrier
+- `Barrier` adalah tipe data yang membuat beberapa thread saling menunggu di satu titik sebelum melanjutkan pekerjaannya secara bersamaan.
+- Inisialisasi `Barrier::new(n)` artinya barrier akan membuka ketika sudah ada `n` thread yang memanggil `.wait()`.
+- Berguna saat kita ingin memastikan semua thread sudah siap sebelum mulai bekerja.
+- Biasanya dikombinasikan dengan `Arc` agar bisa di-share ke banyak thread.
+
+```rust
+#[test]
+fn test_barier() {
+    let barier = std::sync::Arc::new(std::sync::Barrier::new(10));
+    let mut handles = vec![];
+    for i in 0..=10 {
+        let barier_clone = std::sync::Arc::clone(&barier);
+        let handle = thread::spawn(move || {
+            println!("Thread {} is waiting at the barrier", i);
+            barier_clone.wait();
+            println!("Thread {} passed the barrier", i);
+        });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+```
+
+Referensi:
+- https://doc.rust-lang.org/std/sync/struct.Barrier.html
+
+### Once
+- `Once` digunakan untuk memastikan suatu blok kode hanya dieksekusi **satu kali**, tidak peduli berapa banyak thread yang mencoba memanggilnya.
+- Cocok untuk inisialisasi data global atau singleton yang hanya perlu dilakukan sekali.
+- Setelah closure di `call_once` dijalankan pertama kali, semua pemanggilan berikutnya akan langsung di-skip.
+- Itulah sebabnya pada contoh ini nilai `TOTAL_COUNTER` selalu `1` — counter hanya di-increment satu kali.
+
+```rust
+static mut TOTAL_COUNTER: i32 = 0;
+static TOTAL_INIT: std::sync::Once = std::sync::Once::new();
+
+fn get_total_counter() -> i32 {
+    unsafe {
+        TOTAL_INIT.call_once(|| {
+            TOTAL_COUNTER += 1;
+        });
+        return TOTAL_COUNTER;
+    }
+}
+
+#[test]
+fn test_once() {
+    let mut handles = vec![];
+    for _ in 0..10 {
+        let handle = thread::spawn(|| {
+            let total = get_total_counter();
+            println!("total : {}", total);
+        });
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+```
+
+Referensi:
+- https://doc.rust-lang.org/std/sync/struct.Once.html
+
+### Async / Future
+- **Future** adalah representasi komputasi asynchronous yang hasilnya mungkin belum tersedia saat ini.
+- Future bersifat **lazy** — tidak akan dieksekusi sampai ada yang melakukan `await` atau `poll()` terhadapnya.
+- Untuk membuat Future, cukup tambahkan kata kunci `async` pada function; return value-nya otomatis menjadi `Future`.
+- `await` digunakan untuk menunggu hasil Future selesai; hanya bisa dipakai di dalam kode `async`.
+- Rust tidak menyediakan Runtime async secara default — kita perlu library seperti **Tokio** untuk menjalankannya.
+- Gunakan attribute `#[tokio::test]` agar unit test bisa menjalankan kode `async`.
+
+```rust
+async fn get_async_data() -> String {
+    thread::sleep(Duration::from_secs(3));
+    return "Hello from async".to_string();
+}
+
+#[tokio::test]
+async fn test_future() {
+    let result = get_async_data();
+    let result_data = result.await;
+    println!("result : {}", result_data);
+}
+```
+
+Referensi:
+- https://doc.rust-lang.org/std/future/trait.Future.html
+- https://docs.rs/tokio/latest/tokio/
+
+### Concurrent Task
+- **Task** adalah Lightweight Thread yang dikelola oleh Runtime (Tokio), mirip dengan Goroutines di Go atau Coroutines di Kotlin.
+- Berbeda dengan OS Thread yang memakan 2–4 MB per thread, Task jauh lebih ringan.
+- Thread yang menjalankan Task bisa berpindah-pindah Task, misalnya saat Task sedang menunggu I/O (`tokio::time::sleep`), thread akan mengerjakan Task lain.
+- Gunakan `tokio::spawn()` untuk membuat Task, dan `handle.await` untuk menunggu hasilnya.
+- **Penting:** Jangan gunakan `thread::sleep()` di dalam Task — gunakan `tokio::time::sleep().await` agar thread tidak terblokir.
+
+```rust
+async fn load_data_from_database(wait: u64) -> String {
+    println!("Start loading data from database...");
+    tokio::time::sleep(Duration::from_secs(wait)).await;
+    println!("Finished loading data from database");
+    return "Data from database".to_string();
+}
+
+#[tokio::test]
+async fn test_concurrent() {
+    let mut handles = vec![];
+    for i in 0..=5 {
+        let handle = tokio::spawn(load_data_from_database(i));
+        handles.push(handle);
+    }
+    for handle in handles {
+        let result = handle.await.unwrap();
+        println!("result : {}", result);
+    }
+}
+```
+
+Referensi:
+- https://docs.rs/tokio/latest/tokio/task/index.html
+
+### Task Runtime
+- Secara default Tokio sudah menyediakan Runtime, namun kita bisa membuat Runtime sendiri untuk konfigurasi yang lebih fleksibel (misalnya mengatur jumlah worker thread).
+- Runtime Tokio **tidak boleh di-drop di dalam kode async** — oleh karena itu Runtime harus dibuat di scope kode non-async (sync).
+- Gunakan `runtime.block_on(future)` untuk menjalankan async function dari kode sync; `block_on` akan memblokir thread saat ini sampai future selesai.
+- Gunakan `runtime.spawn(future)` di dalam async context untuk menjalankan Task secara concurrent.
+- `Arc` digunakan agar `Runtime` bisa di-share ke dalam async function tanpa masalah ownership.
+
+```rust
+async fn run_concurrent_process(runtime: std::sync::Arc<tokio::runtime::Runtime>) {
+    let mut handles = vec![];
+    for i in 0..=5 {
+        let handle = runtime.spawn(load_data_from_database(i));
+        handles.push(handle);
+    }
+    for handle in handles {
+        let result = handle.await.unwrap();
+        println!("result : {}", result);
+    }
+}
+
+#[test]
+fn test_runtime() {
+    let runtime = std::sync::Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(10)
+            .enable_time()
+            .build()
+            .unwrap(),
+    );
+
+    runtime.block_on(run_concurrent_process(std::sync::Arc::clone(&runtime)));
+}
+```
+
+Referensi:
+- https://docs.rs/tokio/latest/tokio/runtime/struct.Runtime.html
+- https://docs.rs/tokio/latest/tokio/runtime/struct.Builder.html
 
 ## Sample Code Singkat
 
